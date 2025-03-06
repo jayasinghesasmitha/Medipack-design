@@ -1,0 +1,66 @@
+{
+    "version": 1,
+    "author": "Sasmitha Jayasinghe",
+    "editor": "wokwi",
+    "parts": [
+      { "type": "wokwi-breadboard-half", "id": "bb1", "top": -147, "left": 262, "attrs": {} },
+      { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": -4.76, "attrs": {} },
+      {
+        "type": "wokwi-pushbutton",
+        "id": "btn1",
+        "top": -77.4,
+        "left": 358.2,
+        "rotate": 90,
+        "attrs": { "color": "green", "xray": "1" }
+      },
+      {
+        "type": "wokwi-pushbutton",
+        "id": "btn2",
+        "top": -77.4,
+        "left": 483,
+        "rotate": 90,
+        "attrs": { "color": "green", "xray": "1" }
+      },
+      {
+        "type": "wokwi-resistor",
+        "id": "r1",
+        "top": -5.65,
+        "left": 326.4,
+        "attrs": { "value": "1000" }
+      },
+      {
+        "type": "wokwi-resistor",
+        "id": "r2",
+        "top": -5.65,
+        "left": 451.2,
+        "attrs": { "value": "1000" }
+      }
+    ],
+    "connections": [
+      [ "esp:TX", "$serialMonitor:RX", "", [] ],
+      [ "esp:RX", "$serialMonitor:TX", "", [] ],
+      [ "esp:CLK", "bb1:bp.1", "green", [ "h0" ] ],
+      [ "bb1:bp.2", "bb1:5b.j", "green", [ "v0" ] ],
+      [ "esp:GND.2", "bb1:bn.2", "black", [ "v0" ] ],
+      [ "esp:15", "bb1:24b.j", "green", [ "v-9.6", "h441.6" ] ],
+      [ "bb1:18b.j", "bb1:bn.15", "green", [ "v38.4" ] ],
+      [ "btn2:1.l", "bb1:26t.b", "", [ "$bb" ] ],
+      [ "btn2:2.l", "bb1:24t.b", "", [ "$bb" ] ],
+      [ "btn2:1.r", "bb1:26b.g", "", [ "$bb" ] ],
+      [ "btn2:2.r", "bb1:24b.g", "", [ "$bb" ] ],
+      [ "r1:1", "bb1:5b.i", "", [ "$bb" ] ],
+      [ "r1:2", "bb1:11b.i", "", [ "$bb" ] ],
+      [ "r2:1", "bb1:18b.i", "", [ "$bb" ] ],
+      [ "r2:2", "bb1:24b.i", "", [ "$bb" ] ],
+      [ "bb1:tn.11", "bb1:13t.a", "green", [ "v0" ] ],
+      [ "bb1:tp.20", "bb1:26t.a", "green", [ "v0" ] ],
+      [ "bb1:tp.25", "bb1:bp.25", "green", [ "v173.1", "h1.6" ] ],
+      [ "bb1:tn.23", "bb1:bn.23", "green", [ "v0" ] ],
+      [ "esp:2", "bb1:11b.j", "green", [ "h0" ] ],
+      [ "btn1:1.l", "bb1:13t.b", "", [ "$bb" ] ],
+      [ "btn1:2.l", "bb1:11t.b", "", [ "$bb" ] ],
+      [ "btn1:1.r", "bb1:13b.g", "", [ "$bb" ] ],
+      [ "btn1:2.r", "bb1:11b.g", "", [ "$bb" ] ]
+    ],
+    "dependencies": {}
+  }

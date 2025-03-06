@@ -3,32 +3,15 @@
   "author": "Sasmitha Jayasinghe",
   "editor": "wokwi",
   "parts": [
-    { "type": "wokwi-breadboard-mini", "id": "bb1", "top": 75.4, "left": -175.2, "attrs": {} },
-    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 67.2, "left": 129.64, "attrs": {} },
-    {
-      "type": "wokwi-buzzer",
-      "id": "bz1",
-      "top": 21.6,
-      "left": -151.8,
-      "attrs": { "volume": "0.1" }
-    },
-    {
-      "type": "wokwi-resistor",
-      "id": "r1",
-      "top": 109.55,
-      "left": -115.2,
-      "attrs": { "value": "100" }
-    }
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    { "type": "wokwi-dht22", "id": "dht1", "top": -66.9, "left": 196.2, "attrs": {} }
   ],
   "connections": [
     [ "esp:TX", "$serialMonitor:RX", "", [] ],
     [ "esp:RX", "$serialMonitor:TX", "", [] ],
-    [ "bz1:1", "bb1:5t.c", "", [ "$bb" ] ],
-    [ "bz1:2", "bb1:6t.c", "", [ "$bb" ] ],
-    [ "r1:1", "bb1:6t.d", "", [ "$bb" ] ],
-    [ "r1:2", "bb1:12t.d", "", [ "$bb" ] ],
-    [ "bb1:5t.e", "esp:GND.1", "green", [ "v0" ] ],
-    [ "bb1:12t.e", "esp:13", "green", [ "v0" ] ]
+    [ "esp:3V3", "dht1:VCC", "green", [ "h-91.01", "v-76.8", "h220.8", "v19.2" ] ],
+    [ "esp:GND.2", "dht1:GND", "black", [ "v0", "h14.44", "v201.6", "h134.4" ] ],
+    [ "esp:15", "dht1:SDA", "green", [ "v0", "h91.24" ] ]
   ],
   "dependencies": {}
 }
