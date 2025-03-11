@@ -9,6 +9,9 @@
 #define OLED_RESET -1
 #define SCREEN_ADDRESS 0x3C
 
+#define BUZZER 5
+#define LED_1 15
+
 // Declare OLED display object
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
@@ -21,10 +24,32 @@ int seconds = 0;
 unsigned long time_now = 0;
 unsigned long time_last = 0;
 
+bool alarm_enabled = true ; 
+int n_alarms = 2;
+int alarm_hours[] = {0, 1};
+int alarm_minutes[] = {1, 10};
+bool alarm_triggered[] = {false, false};
+
+
+int n_notes = 8;
+int C = 261;
+int D = 294;
+int E = 329;
+int F = 349;
+int G = 392;
+int A = 440;
+int B = 493;
+int C_H = 523;
+
+int notes[] = {C, D, E, F, G, A, B, C_H};
+
 // Function prototype (declaring before setup)
 void print_line(String text);
 
 void setup() {
+  pinMode(BUZZER, OUTPUT);
+  pinMode(LED_1, OUTPUT);
+
   Serial.begin(9600);
 
   // Initialize OLED display
@@ -39,14 +64,14 @@ void setup() {
   display.clearDisplay();
 
 print_line("Welcome to Medibox!", 10, 20, 2);
+delay(500);
 display.clearDisplay();
 
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
-  update_time();
-  print_time_now();
+  update_time_with_check_alarm();
 }
 
 void print_line(String text, int column, int row, int text_size){
@@ -91,5 +116,35 @@ void update_time(){
   if (hours >= 24){
     days += 1;
     hours = 0;
+  }
+}
+
+void ring_alarm(){
+  display.clearDisplay();
+  print_line("Medicine time!", 0, 0, 2);
+
+  digitalWrite(LED_1, HIGH);
+
+  //ring the bell
+  for(int i = 0; i < n_notes; i++){
+    tone(BUZZER, notes[i]);
+    delay(500);
+    noTone(BUZZER);
+    delay(2);
+  }
+  digitalWrite(LED_1, LOW);
+  display.clearDisplay();
+}
+
+void update_time_with_check_alarm(void){
+  update_time();
+  print_time_now();
+
+  if(alarm_enabled == true){
+    for(int i = 0; i < n_alarms; i++){
+      if(alarm_triggered[i] == false && alarm_hours[i] == hours && alarm_minutes[i] == minutes){
+        ring_alarm();
+      }
+    }
   }
 }
