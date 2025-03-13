@@ -3,6 +3,7 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <DHTesp.h>
+#include <WiFi.h>
 
 // Define OLED parameters
 #define SCREEN_WIDTH 128
@@ -17,6 +18,10 @@
 #define PB_UP 33
 #define PB_DOWN 35
 #define DHTPIN 12
+
+#define NTP_SERVER     "pool.ntp.org"
+#define UTC_OFFSET     0
+#define UTC_OFFSET_DST 0
 
 // Declare objects
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
@@ -76,6 +81,18 @@ void setup() {
   display.display();
   delay(500);
 
+  WiFi.begin("Wokwi-GUEST", "", 6);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(250);
+    display.clearDisplay();
+    print_line("Connecting to WiFi", 0, 0, 2);
+  }
+
+  display.clearDisplay();
+  print_line("Connected to WiFi", 0, 0, 2);
+
+  configTime(UTC_OFFSET, UTC_OFFSET_DST, NTP_SERVER);
+
   // Clear the buffer
   display.clearDisplay();
 
@@ -116,24 +133,25 @@ void print_time_now(void) {
 }
 
 void update_time() {
-    timeNow = millis() / 1000; // seconds passed from bootup
-    seconds = timeNow - timeLast;
-
-    if (seconds >= 60) {
-        minutes += 1;
-        timeLast += 60;
-    }
-
-    if (minutes == 60) {
-        hours += 1;
-        minutes = 0;
-    }
-
-    if (hours == 24) {
-        days += 1;
-        hours = 0;
-    }
-}
+    struct tm timeinfo;
+    getLocalTime(&timeinfo);
+  
+    char timeHour[3];
+    strftime(timeHour, 3, "%H", &timeinfo);
+    hours = atoi(timeHour);
+  
+    char timeMinute[3];
+    strftime(timeMinute, 3, "%M", &timeinfo);
+    minutes = atoi(timeMinute);
+  
+    char timeSecond[3];
+    strftime(timeSecond, 3, "%S", &timeinfo);
+    seconds = atoi(timeSecond);
+  
+    char timeDay[3];
+    strftime(timeDay, 3, "%d", &timeinfo);
+    days = atoi(timeDay);
+  }
 
 void ring_alarm() {
   display.clearDisplay();
