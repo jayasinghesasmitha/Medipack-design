@@ -388,7 +388,7 @@ void check_temp(){
       display.clearDisplay();
       print_line("TEMP LOW", 0, 40, 1);
     }
-    if (data.humidity > 40){
+    if (data.humidity >= 40){
       display.clearDisplay();
       print_line("HUMIDITY HIGH", 0, 50, 1);
     }
