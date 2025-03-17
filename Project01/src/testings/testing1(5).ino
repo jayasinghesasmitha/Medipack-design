@@ -26,7 +26,6 @@
 // Declare objects
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 DHTesp dhtSensor;
-int utc_offset = 0;
 
 // Global variables
 int days = 0;
@@ -55,47 +54,52 @@ int C_H = 523;
 int notes[] = {C, D, E, F, G, A, B, C_H};
 
 int current_mode = 0;
-int max_modes = 5;
-String modes[] = {"1 - Set Time", "2 - Set Alarm 1", "3 - Set Alarm 2", "4 - Disable Alarm", "5 - Set Time Zone"};
-
+int max_modes = 4;
+String modes[] = {"1 - Set Time", "2 - Set Alarm 1", "3 - Set Alarm 2", "4 - Dosable Alarm"};
 
 void setup() {
-    pinMode(BUZZER, OUTPUT);
-    pinMode(LED_1, OUTPUT);
-    pinMode(PB_CANCEL, INPUT);
-    pinMode(PB_OK, INPUT);
-    pinMode(PB_DOWN, INPUT);
-    pinMode(PB_UP, INPUT);
+  // put your setup code here, to run once:
+  pinMode(BUZZER, OUTPUT);
+  pinMode(LED_1, OUTPUT);
+  pinMode(PB_CANCEL, INPUT);
+  pinMode(PB_OK, INPUT);
+  pinMode(PB_DOWN, INPUT);
+  pinMode(PB_UP, INPUT);
 
-    dhtSensor.setup(DHTPIN, DHTesp::DHT22);
-    Serial.begin(9600);
+  dhtSensor.setup(DHTPIN, DHTesp::DHT22);
 
-    if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
-        Serial.println(F("SSD1306 allocation failed"));
-        for (;;);
-    }
+  Serial.begin(9600);
 
-    display.display();
-    delay(500);
+  // SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
+  if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
+      Serial.println(F("SSD1306 allocation failed"));
+      for (;;);
+  }
 
-    WiFi.begin("Wokwi-GUEST", "", 6);
-    while (WiFi.status() != WL_CONNECTED) {
-        delay(250);
-        display.clearDisplay();
-        print_line("Connecting to WiFi", 0, 0, 2);
-    }
+  // Show the display buffer on the screen. You MUST call display() after
+  // drawing commands to make them visible on screen!
+  display.display();
+  delay(500);
 
+  WiFi.begin("Wokwi-GUEST", "", 6);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(250);
     display.clearDisplay();
-    print_line("Connected to WiFi", 0, 0, 2);
+    print_line("Connecting to WiFi", 0, 0, 2);
+  }
 
-    configTime(utc_offset * 3600, 0, NTP_SERVER);  // Apply the offset dynamically
+  display.clearDisplay();
+  print_line("Connected to WiFi", 0, 0, 2);
 
-    display.clearDisplay();
-    print_line("Welcome to Medibox!", 10, 20, 2);
-    delay(500);
-    display.clearDisplay();
+  configTime(UTC_OFFSET, UTC_OFFSET_DST, NTP_SERVER);
+
+  // Clear the buffer
+  display.clearDisplay();
+
+  print_line("Welcome to Medibox!", 10, 20, 2);
+  delay(500);
+  display.clearDisplay();
 }
-
 
 void loop() {
   // put your main code here, to run repeatedly:
@@ -131,26 +135,23 @@ void print_time_now(void) {
 void update_time() {
     struct tm timeinfo;
     getLocalTime(&timeinfo);
-
+  
     char timeHour[3];
     strftime(timeHour, 3, "%H", &timeinfo);
     hours = atoi(timeHour);
-
+  
     char timeMinute[3];
     strftime(timeMinute, 3, "%M", &timeinfo);
     minutes = atoi(timeMinute);
-
+  
     char timeSecond[3];
     strftime(timeSecond, 3, "%S", &timeinfo);
     seconds = atoi(timeSecond);
-
+  
     char timeDay[3];
     strftime(timeDay, 3, "%d", &timeinfo);
     days = atoi(timeDay);
-
-    // Display time on OLED
-    print_time_now();
-}
+  }
 
 void ring_alarm() {
   display.clearDisplay();
@@ -223,18 +224,9 @@ void go_to_menu() {
         display.clearDisplay();
         print_line(modes[current_mode], 0, 0, 2);
 
-        int pressed = wait_for_button_press();
-        if (pressed == PB_UP) {
-            current_mode = (current_mode + 1) % max_modes;
-        } else if (pressed == PB_DOWN) {
-            current_mode = (current_mode - 1 + max_modes) % max_modes;
-        } else if (pressed == PB_OK) {
-            run_mode(current_mode);
-            break;
-        }
+        
     }
 }
-
 void set_time() {
     
     int temp_hour = hours;
@@ -304,38 +296,6 @@ void set_time() {
     print_line("Time set!", 0, 0, 2);
     delay(1000);
 }
-
-void set_time_zone() {
-    int temp_offset = utc_offset;
-
-    while (true) {
-        display.clearDisplay();
-        print_line("Set UTC Offset:", 0, 0, 2);
-        print_line("Current: " + String(temp_offset), 0, 20, 2);
-
-        int pressed = wait_for_button_press();
-        if (pressed == PB_UP) {
-            delay(200);
-            temp_offset += 1;
-        } else if (pressed == PB_DOWN) {
-            delay(200);
-            temp_offset -= 1;
-        } else if (pressed == PB_OK) {
-            delay(200);
-            utc_offset = temp_offset;
-            configTime(utc_offset * 3600, 0, NTP_SERVER);  // Update time with new offset
-            break;
-        } else if (pressed == PB_CANCEL) {
-            delay(200);
-            break;
-        }
-    }
-
-    display.clearDisplay();
-    print_line("Time zone set!", 0, 0, 2);
-    delay(1000);
-}
-
 
 void set_alarm(int alarm){
     int temp_hour = alarm_hours[alarm];
@@ -409,15 +369,14 @@ void set_alarm(int alarm){
 void run_mode(int mode) {
     if (mode == 0) {
         set_time();
-    } else if (mode == 1 || mode == 2) {
-        set_alarm(mode - 1);
-    } else if (mode == 3) {
+    }
+    else if (mode == 1 || mode == 2) {
+        set_alarm(mode -1);
+    }
+    else if (mode == 3) {
         alarm_enabled = false;
-    } else if (mode == 4) {  // Add a new mode for setting the time zone
-        set_time_zone();
     }
 }
-
 
 void check_temp() {
     TempAndHumidity data = dhtSensor.getTempAndHumidity();
