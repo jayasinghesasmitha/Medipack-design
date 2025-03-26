@@ -38,7 +38,7 @@ unsigned long timeLast = 0;
 
 bool alarm_enabled = true;
 int n_alarms = 2;
-int max_alarms = 5; // Increased max alarms
+int max_alarms = 5;
 int alarm_hours[] = {0, 1, -1, -1, -1}; // -1 means alarm slot is empty
 int alarm_minutes[] = {1, 10, -1, -1, -1};
 bool alarm_triggered[] = {false, false, false, false, false};
@@ -55,10 +55,10 @@ int C_H = 523;
 int notes[] = {C, D, E, F, G, A, B, C_H};
 
 int current_mode = 0;
-int max_modes = 8; // Increased for new options
+int max_modes = 7;
 String modes[] = {"1 - Set Time", "2 - Set Alarm 1", "3 - Set Alarm 2", 
                   "4 - Disable Alarm", "5 - Set Time Zone", "6 - View Alarms", 
-                  "7 - Delete Alarm", "8 - Add Alarm"};
+                  "7 - Delete Alarm"};
 
 int utc_offset = 0;
 int utc_offset_dst = 0;
@@ -151,29 +151,51 @@ void update_time() {
 }
 
 void ring_alarm() {
-  display.clearDisplay();
-  print_line("MEDICINE TIME!", 0, 0, 2);
-
-  digitalWrite(LED_1, HIGH);
-
-  bool break_happened = false;
-
-  while (break_happened == false && digitalRead(PB_CANCEL) == HIGH) {
-      for (int i = 0; i < n_notes; i++) {
-          if (digitalRead(PB_CANCEL) == LOW) {
-              delay(200);
-              break_happened = true;
-              break;
-          }
-          tone(BUZZER, notes[i]);
-          delay(500);
-          noTone(BUZZER);
-          delay(2);
+  bool alarm_stopped = false;
+  unsigned long last_blink = millis();
+  bool led_state = HIGH;
+  int current_note = 0;
+  
+  while (!alarm_stopped) {
+    // Blink LED every 500ms
+    if (millis() - last_blink > 500) {
+      led_state = !led_state;
+      digitalWrite(LED_1, led_state);
+      last_blink = millis();
+      
+      // Update display only when LED changes state
+      display.clearDisplay();
+      if (led_state == HIGH) {
+        print_line("MEDICINE TIME!", 0, 0, 2);
+        print_line(String(alarm_hours[current_mode]) + ":" + 
+                 (alarm_minutes[current_mode] < 10 ? "0" : "") + 
+                 String(alarm_minutes[current_mode]), 0, 20, 2);
+        print_line("Press CANCEL", 0, 40, 1);
+        print_line("to stop alarm", 0, 50, 1);
       }
+    }
+    
+    // Play alarm tone sequence
+    if (!alarm_stopped) {
+      tone(BUZZER, notes[current_note], 300);
+      delay(350);
+      noTone(BUZZER);
+      current_note = (current_note + 1) % n_notes;
+    }
+    
+    // Check for cancel button press
+    if (digitalRead(PB_CANCEL) == LOW) {
+      alarm_stopped = true;
+      delay(200); // Debounce delay
+    }
   }
-
+  
+  // Clean up after alarm is stopped
   digitalWrite(LED_1, LOW);
+  noTone(BUZZER);
   display.clearDisplay();
+  print_line("Alarm stopped", 0, 0, 1);
+  delay(1000);
 }
 
 void update_time_with_check_alarm(void) {
@@ -184,8 +206,13 @@ void update_time_with_check_alarm(void) {
       for (int i = 0; i < max_alarms; i++) {
           if (alarm_hours[i] != -1 && alarm_triggered[i] == false && 
               alarm_hours[i] == hours && alarm_minutes[i] == minutes) {
+              current_mode = i; // Store which alarm is triggered
               ring_alarm();
               alarm_triggered[i] = true;
+          }
+          // Reset alarm trigger at midnight
+          if (hours == 0 && minutes == 0) {
+            alarm_triggered[i] = false;
           }
       }
   }
@@ -488,26 +515,6 @@ void delete_alarm() {
     }
 }
 
-void add_alarm() {
-    // Find first empty alarm slot
-    int empty_slot = -1;
-    for (int i = 0; i < max_alarms; i++) {
-        if (alarm_hours[i] == -1) {
-            empty_slot = i;
-            break;
-        }
-    }
-    
-    if (empty_slot == -1) {
-        display.clearDisplay();
-        print_line("No free alarm slots", 0, 0, 1);
-        delay(1000);
-        return;
-    }
-    
-    set_alarm(empty_slot);
-}
-
 void run_mode(int mode) {
     if (mode == 0) {
         set_time();
@@ -529,9 +536,6 @@ void run_mode(int mode) {
     }
     else if (mode == 6) {
         delete_alarm();
-    }
-    else if (mode == 7) {
-        add_alarm();
     }
 }
 
