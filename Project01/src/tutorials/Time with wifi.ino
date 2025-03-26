@@ -223,9 +223,35 @@ void go_to_menu() {
     while (digitalRead(PB_CANCEL) == HIGH) {
         display.clearDisplay();
         print_line(modes[current_mode], 0, 0, 2);
-
-        
-    }
+    
+        int pressed = wait_for_button_press();
+    
+        if (pressed == PB_UP) {
+          delay(200);
+          current_mode += 1;
+          current_mode = current_mode % max_modes;
+        }
+    
+        if (pressed == PB_DOWN) {
+          delay(200);
+          current_mode -= 1;
+    
+          if (current_mode < 0 ) {
+            current_mode = max_modes - 1;
+          }
+        }
+    
+        else if (pressed == PB_OK) {
+          delay(200);
+          Serial.println(current_mode);
+          run_mode(current_mode);
+        }
+    
+        else if (pressed == PB_CANCEL) {
+          delay(200);
+          break;
+        }
+      }
 }
 void set_time() {
     
