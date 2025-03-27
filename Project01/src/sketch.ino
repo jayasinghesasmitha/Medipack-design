@@ -1,11 +1,9 @@
-// Include libraries
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <DHTesp.h>
 #include <WiFi.h>
 
-// Define OLED parameters
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
 #define OLED_RESET -1
@@ -24,11 +22,9 @@
 #define UTC_OFFSET_DST 0
 #define SNOOZE_MINUTES 5
 
-// Declare objects
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 DHTesp dhtSensor;
 
-// Global variables
 int days = 0;
 int hours = 0;
 int minutes = 0;
@@ -40,10 +36,10 @@ unsigned long timeLast = 0;
 bool alarm_enabled = true;
 int n_alarms = 2;
 int max_alarms = 5;
-int alarm_hours[] = {0, 1, -1, -1, -1}; // -1 means alarm slot is empty
+int alarm_hours[] = {0, 1, -1, -1, -1}; 
 int alarm_minutes[] = {1, 10, -1, -1, -1};
 bool alarm_triggered[] = {false, false, false, false, false};
-int snooze_hours[] = {-1, -1, -1, -1, -1}; // Track snooze times separately
+int snooze_hours[] = {-1, -1, -1, -1, -1};
 int snooze_minutes[] = {-1, -1, -1, -1, -1};
 
 int n_notes = 8;
@@ -158,16 +154,13 @@ void ring_alarm() {
   unsigned long last_blink = millis();
   bool led_state = HIGH;
   int current_note = 0;
-  int current_alarm = current_mode; // Store which alarm is currently ringing
-  
+  int current_alarm = current_mode; 
   while (!alarm_stopped && !alarm_snoozed) {
-    // Blink LED every 500ms
     if (millis() - last_blink > 500) {
       led_state = !led_state;
       digitalWrite(LED_1, led_state);
       last_blink = millis();
       
-      // Update display only when LED changes state
       display.clearDisplay();
       if (led_state == HIGH) {
         print_line("MEDICINE TIME!", 0, 0, 2);
@@ -179,7 +172,6 @@ void ring_alarm() {
       }
     }
     
-    // Play alarm tone sequence
     if (!alarm_stopped && !alarm_snoozed) {
       tone(BUZZER, notes[current_note], 300);
       delay(350);
@@ -187,20 +179,17 @@ void ring_alarm() {
       current_note = (current_note + 1) % n_notes;
     }
     
-    // Check for cancel button press (stop alarm)
     if (digitalRead(PB_CANCEL) == LOW) {
       alarm_stopped = true;
-      delay(200); // Debounce delay
+      delay(200); 
     }
-    
-    // Check for OK button press (snooze alarm)
+
     if (digitalRead(PB_OK) == LOW) {
       alarm_snoozed = true;
-      delay(200); // Debounce delay
+      delay(200); 
     }
   }
   
-  // Clean up after alarm is stopped or snoozed
   digitalWrite(LED_1, LOW);
   noTone(BUZZER);
   
@@ -208,13 +197,12 @@ void ring_alarm() {
     display.clearDisplay();
     print_line("Alarm stopped", 0, 0, 1);
     alarm_triggered[current_alarm] = true;
-    snooze_hours[current_alarm] = -1; // Clear any existing snooze
+    snooze_hours[current_alarm] = -1; 
     snooze_minutes[current_alarm] = -1;
     delay(1000);
   }
   
   if (alarm_snoozed) {
-    // Calculate snooze time (current time + 5 minutes)
     int snooze_min = minutes + SNOOZE_MINUTES;
     int snooze_hr = hours;
     
@@ -226,10 +214,9 @@ void ring_alarm() {
       }
     }
     
-    // Store snooze time separately
     snooze_hours[current_alarm] = snooze_hr;
     snooze_minutes[current_alarm] = snooze_min;
-    alarm_triggered[current_alarm] = false; // Reset trigger to allow re-ringing
+    alarm_triggered[current_alarm] = false; 
     
     display.clearDisplay();
     print_line("Alarm snoozed", 0, 0, 1);
@@ -244,23 +231,20 @@ void update_time_with_check_alarm(void) {
 
   if (alarm_enabled == true) {
       for (int i = 0; i < max_alarms; i++) {
-          // Check if it's time for original alarm
           bool is_original_alarm_time = (alarm_hours[i] != -1) && 
                                      (alarm_triggered[i] == false) && 
                                      (hours == alarm_hours[i]) && 
                                      (minutes == alarm_minutes[i]);
           
-          // Check if it's time for snoozed alarm
           bool is_snooze_time = (snooze_hours[i] != -1) && 
                               (hours == snooze_hours[i]) && 
                               (minutes == snooze_minutes[i]);
           
           if (is_original_alarm_time || is_snooze_time) {
-              current_mode = i; // Store which alarm is triggered
+              current_mode = i; 
               ring_alarm();
               
               if (is_snooze_time) {
-                // Clear the snooze time after it has rung
                 snooze_hours[i] = -1;
                 snooze_minutes[i] = -1;
               }
@@ -268,7 +252,6 @@ void update_time_with_check_alarm(void) {
               alarm_triggered[i] = true;
           }
           
-          // Reset alarm trigger at midnight
           if (hours == 0 && minutes == 0) {
             alarm_triggered[i] = false;
           }
@@ -508,14 +491,13 @@ void view_alarms() {
     if (y_pos == 0) {
         print_line("No alarms set", 0, 0, 1);
     }
-    wait_for_button_press(); // Wait for any button press
+    wait_for_button_press(); 
 }
 
 void delete_alarm() {
     int selected_alarm = 0;
     int active_alarms = 0;
-    
-    // Count active alarms
+ 
     for (int i = 0; i < max_alarms; i++) {
         if (alarm_hours[i] != -1) active_alarms++;
     }
@@ -527,7 +509,6 @@ void delete_alarm() {
         return;
     }
     
-    // Find first active alarm
     while (alarm_hours[selected_alarm] == -1 && selected_alarm < max_alarms) {
         selected_alarm++;
     }
