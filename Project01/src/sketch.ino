@@ -22,6 +22,7 @@
 #define NTP_SERVER     "pool.ntp.org"
 #define UTC_OFFSET     0
 #define UTC_OFFSET_DST 0
+#define SNOOZE_MINUTES 5
 
 // Declare objects
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
@@ -42,6 +43,8 @@ int max_alarms = 5;
 int alarm_hours[] = {0, 1, -1, -1, -1}; // -1 means alarm slot is empty
 int alarm_minutes[] = {1, 10, -1, -1, -1};
 bool alarm_triggered[] = {false, false, false, false, false};
+int snooze_hours[] = {-1, -1, -1, -1, -1}; // Track snooze times separately
+int snooze_minutes[] = {-1, -1, -1, -1, -1};
 
 int n_notes = 8;
 int C = 262;
@@ -60,8 +63,7 @@ String modes[] = {"1 - Set Time", "2 - Set Alarm 1", "3 - Set Alarm 2",
                   "4 - Disable Alarm", "5 - Set Time Zone", "6 - View Alarms", 
                   "7 - Delete Alarm"};
 
-int utc_offset = 0;
-int utc_offset_dst = 0;
+float utc_offset = 0;
 
 void setup() {
   pinMode(BUZZER, OUTPUT);
@@ -152,11 +154,13 @@ void update_time() {
 
 void ring_alarm() {
   bool alarm_stopped = false;
+  bool alarm_snoozed = false;
   unsigned long last_blink = millis();
   bool led_state = HIGH;
   int current_note = 0;
+  int current_alarm = current_mode; // Store which alarm is currently ringing
   
-  while (!alarm_stopped) {
+  while (!alarm_stopped && !alarm_snoozed) {
     // Blink LED every 500ms
     if (millis() - last_blink > 500) {
       led_state = !led_state;
@@ -167,35 +171,71 @@ void ring_alarm() {
       display.clearDisplay();
       if (led_state == HIGH) {
         print_line("MEDICINE TIME!", 0, 0, 2);
-        print_line(String(alarm_hours[current_mode]) + ":" + 
-                 (alarm_minutes[current_mode] < 10 ? "0" : "") + 
-                 String(alarm_minutes[current_mode]), 0, 20, 2);
-        print_line("Press CANCEL", 0, 40, 1);
-        print_line("to stop alarm", 0, 50, 1);
+        print_line(String(alarm_hours[current_alarm]) + ":" + 
+                 (alarm_minutes[current_alarm] < 10 ? "0" : "") + 
+                 String(alarm_minutes[current_alarm]), 0, 20, 2);
+        print_line("OK: Snooze 5min", 0, 40, 1);
+        print_line("CANCEL: Stop", 0, 50, 1);
       }
     }
     
     // Play alarm tone sequence
-    if (!alarm_stopped) {
+    if (!alarm_stopped && !alarm_snoozed) {
       tone(BUZZER, notes[current_note], 300);
       delay(350);
       noTone(BUZZER);
       current_note = (current_note + 1) % n_notes;
     }
     
-    // Check for cancel button press
+    // Check for cancel button press (stop alarm)
     if (digitalRead(PB_CANCEL) == LOW) {
       alarm_stopped = true;
       delay(200); // Debounce delay
     }
+    
+    // Check for OK button press (snooze alarm)
+    if (digitalRead(PB_OK) == LOW) {
+      alarm_snoozed = true;
+      delay(200); // Debounce delay
+    }
   }
   
-  // Clean up after alarm is stopped
+  // Clean up after alarm is stopped or snoozed
   digitalWrite(LED_1, LOW);
   noTone(BUZZER);
-  display.clearDisplay();
-  print_line("Alarm stopped", 0, 0, 1);
-  delay(1000);
+  
+  if (alarm_stopped) {
+    display.clearDisplay();
+    print_line("Alarm stopped", 0, 0, 1);
+    alarm_triggered[current_alarm] = true;
+    snooze_hours[current_alarm] = -1; // Clear any existing snooze
+    snooze_minutes[current_alarm] = -1;
+    delay(1000);
+  }
+  
+  if (alarm_snoozed) {
+    // Calculate snooze time (current time + 5 minutes)
+    int snooze_min = minutes + SNOOZE_MINUTES;
+    int snooze_hr = hours;
+    
+    if (snooze_min >= 60) {
+      snooze_min -= 60;
+      snooze_hr += 1;
+      if (snooze_hr >= 24) {
+        snooze_hr -= 24;
+      }
+    }
+    
+    // Store snooze time separately
+    snooze_hours[current_alarm] = snooze_hr;
+    snooze_minutes[current_alarm] = snooze_min;
+    alarm_triggered[current_alarm] = false; // Reset trigger to allow re-ringing
+    
+    display.clearDisplay();
+    print_line("Alarm snoozed", 0, 0, 1);
+    print_line("Until " + String(snooze_hr) + ":" + (snooze_min < 10 ? "0" : "") + String(snooze_min), 0, 20, 1);
+    delay(2000);
+  }
 }
 
 void update_time_with_check_alarm(void) {
@@ -204,12 +244,30 @@ void update_time_with_check_alarm(void) {
 
   if (alarm_enabled == true) {
       for (int i = 0; i < max_alarms; i++) {
-          if (alarm_hours[i] != -1 && alarm_triggered[i] == false && 
-              alarm_hours[i] == hours && alarm_minutes[i] == minutes) {
+          // Check if it's time for original alarm
+          bool is_original_alarm_time = (alarm_hours[i] != -1) && 
+                                     (alarm_triggered[i] == false) && 
+                                     (hours == alarm_hours[i]) && 
+                                     (minutes == alarm_minutes[i]);
+          
+          // Check if it's time for snoozed alarm
+          bool is_snooze_time = (snooze_hours[i] != -1) && 
+                              (hours == snooze_hours[i]) && 
+                              (minutes == snooze_minutes[i]);
+          
+          if (is_original_alarm_time || is_snooze_time) {
               current_mode = i; // Store which alarm is triggered
               ring_alarm();
+              
+              if (is_snooze_time) {
+                // Clear the snooze time after it has rung
+                snooze_hours[i] = -1;
+                snooze_minutes[i] = -1;
+              }
+              
               alarm_triggered[i] = true;
           }
+          
           // Reset alarm trigger at midnight
           if (hours == 0 && minutes == 0) {
             alarm_triggered[i] = false;
@@ -402,28 +460,27 @@ void set_alarm(int alarm){
 }
 
 void set_time_zone() {
-    int temp_offset = utc_offset;
+    float temp_offset = utc_offset;
     while (true) {
         display.clearDisplay();
         print_line("UTC Offset: " + String(temp_offset), 0, 0, 2);
-        print_line("(-12 to +12)", 0, 20, 1);
+        print_line("(-12 to +14)", 2, 40, 1);
 
         int pressed = wait_for_button_press();
         if (pressed == PB_UP) {
             delay(200);
-            temp_offset += 1;
-            if (temp_offset > 12) temp_offset = -12;
+            temp_offset += 0.5;
+            if (temp_offset > 14) temp_offset = -12;
         }
         else if (pressed == PB_DOWN) {
             delay(200);
-            temp_offset -= 1;
-            if (temp_offset < -12) temp_offset = 12;
+            temp_offset -= 0.5;
+            if (temp_offset < -12) temp_offset = 14;
         }
         else if (pressed == PB_OK) {
             delay(200);
             utc_offset = temp_offset;
-            utc_offset_dst = temp_offset; // Using same for DST
-            configTime(utc_offset * 3600, utc_offset_dst * 3600, NTP_SERVER);
+            configTime(utc_offset * 3600, UTC_OFFSET_DST, NTP_SERVER);
             break;
         }
         else if (pressed == PB_CANCEL) {
