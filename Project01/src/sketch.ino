@@ -225,28 +225,6 @@ void ring_alarm() {
   }
 }
 
-void ring_alarm_2(bool should_stop_ringing) {
-    bool alarm_stopped = false;
-    
-    while (!alarm_stopped) {
-        // If should_stop_ringing is FALSE, keep ringing
-        if (!should_stop_ringing) {
-            tone(BUZZER, 200, 300); // Beep at 200Hz for 300ms
-            delay(350);             // Short delay between beeps
-            noTone(BUZZER);          // Stop sound
-        }
-        
-        // Check if CANCEL button is pressed (stops in all cases)
-        if (digitalRead(PB_CANCEL) == LOW) {
-            alarm_stopped = true;
-            delay(200); // Debounce delay
-        }
-    }
-    
-    // Ensure buzzer is off when stopped
-    noTone(BUZZER);
-}
-
 void update_time_with_check_alarm(void) {
   update_time();
   print_time_now();
