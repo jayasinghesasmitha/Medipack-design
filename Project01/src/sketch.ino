@@ -225,6 +225,28 @@ void ring_alarm() {
   }
 }
 
+void ring_alarm_2(bool should_stop_ringing) {
+    bool alarm_stopped = false;
+    
+    while (!alarm_stopped) {
+        // If should_stop_ringing is FALSE, keep ringing
+        if (!should_stop_ringing) {
+            tone(BUZZER, 200, 300); // Beep at 200Hz for 300ms
+            delay(350);             // Short delay between beeps
+            noTone(BUZZER);          // Stop sound
+        }
+        
+        // Check if CANCEL button is pressed (stops in all cases)
+        if (digitalRead(PB_CANCEL) == LOW) {
+            alarm_stopped = true;
+            delay(200); // Debounce delay
+        }
+    }
+    
+    // Ensure buzzer is off when stopped
+    noTone(BUZZER);
+}
+
 void update_time_with_check_alarm(void) {
   update_time();
   print_time_now();
@@ -577,22 +599,56 @@ void run_mode(int mode) {
     }
 }
 
-void check_temp(){
+void check_temp() {
+    static bool wasAbnormal = false; 
     TempAndHumidity data = dhtSensor.getTempAndHumidity();
-    if (data.temperature > 35){
-      display.clearDisplay();
-      print_line("TEMP HIGH", 0, 40, 1);
+    bool abnormalCondition = false;
+
+    if (data.temperature > 32) {
+        display.clearDisplay();
+        print_line("TEMP HIGH", 0, 40, 1);
+        abnormalCondition = true;
     }
-    else if (data.temperature < 25){
-      display.clearDisplay();
-      print_line("TEMP LOW", 0, 40, 1);
+    else if (data.temperature < 24) {
+        display.clearDisplay();
+        print_line("TEMP LOW", 0, 40, 1);
+        abnormalCondition = true;
     }
-    if (data.humidity >= 40){
-      display.clearDisplay();
-      print_line("HUMIDITY HIGH", 0, 50, 1);
+
+    if (data.humidity > 80) {
+        display.clearDisplay();
+        print_line("HUMIDITY HIGH", 0, 50, 1);
+        abnormalCondition = true;
     }
-    else if (data.humidity < 20){
-      display.clearDisplay();
-      print_line("HUMIDITY LOW", 0, 50, 1);
+    else if (data.humidity < 65) {
+        display.clearDisplay();
+        print_line("HUMIDITY LOW", 0, 50, 1);
+        abnormalCondition = true;
+    }
+
+    if (abnormalCondition) {
+        digitalWrite(LED_1, HIGH);
+        if (!wasAbnormal) {
+            tone(BUZZER, 1000); 
+        }
+    } 
+    else {
+        digitalWrite(LED_1, LOW);
+        noTone(BUZZER); 
+        display.clearDisplay();
+        print_line("NORMAL", 0, 40, 1);
+    }
+    wasAbnormal = abnormalCondition;
+
+    static unsigned long lastButtonCheck = 0;
+    if (millis() - lastButtonCheck > 200) { 
+        if (digitalRead(PB_CANCEL) == LOW) {
+            noTone(BUZZER); 
+            digitalWrite(LED_1, LOW); 
+            display.clearDisplay();
+            print_line("ALARM SILENCED", 0, 40, 1);
+            delay(1000);
+        }
+        lastButtonCheck = millis();
     }
 }
