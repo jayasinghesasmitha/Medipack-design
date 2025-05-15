@@ -1,82 +1,136 @@
-#include <PubSubClient.h>
 #include <WiFi.h>
+#include <PubSubClient.h>
 #include <DHTesp.h>
+#include <NTPClient.h>
+#include <WiFiUdp.h>
 
 #define DHTPIN 12
+#define BUZZER 5
 
 WiFiClient espClient;
 PubSubClient mqttClient(espClient);
-DHTesp dhtSensor;
+
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP);
 
 char tempAr[6];
+DHTesp dhtSensor;
+bool isSceduleON =false;
+unsigned long scheduledOnTime;
 
 void setup() {
   Serial.begin(115200);
   setupWifi();
-  setupMQTT();
+  setupMqtt();
   dhtSensor.setup(DHTPIN, DHTesp::DHT22);
+  timeClient.begin();
+  timeClient.setTimeOffset(5.5 * 3600); 
+  pinMode(BUZZER, OUTPUT);
+  digitalWrite(BUZZER, LOW);
 }
 
 void loop() {
-  if(!mqttClient.connected()) {
+  // put your main code here, to run repeatedly:
+  if (!mqttClient.connected()) {
     connectToBroker();
   }
   mqttClient.loop();
-
   updateTemperature();
   Serial.println(tempAr);
-  mqttClient.publish("CSE",tempAr);
+  mqttClient.publish("CSE-ADMIN-TEMP", tempAr);
+  checkSchdule();
   delay(1000);
 }
 
-void setupMQTT() {
+void buzzerOn(bool on) {
+  if (on) {
+    tone(BUZZER, 256);
+  } else {
+    noTone(BUZZER);
+  }
+}
+
+void setupMqtt() {
   mqttClient.setServer("broker.hivemq.com", 1883);
   mqttClient.setCallback(receiveCallback);
 }
 
-void setupWifi() {
-  WiFi.begin("Wokwi-GUEST", "");
+void receiveCallback(char* topic, byte* payload, unsigned int length) {
+  Serial.println("Message arrived [");
+  Serial.println(topic);
+  Serial.println("] ");
 
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
+  char payloadCharAr[length];
+  for (int i = 0; i < length; i++) {
+    Serial.println((char)payload[i]);
+    payloadCharAr[i] = (char)payload[i];
   }
+  Serial.println();
 
-  Serial.println("");
-    Serial.println("WiFi connected");
-    Serial.println("IP address: ");       
-    Serial.println(WiFi.localIP());
+  if (strcmp(topic, "CSE-ADMIN-MAIN-ON-OFF") == 0) {
+    buzzerOn(payloadCharAr[0] == '1');
+  }else if(strcmp(topic, "CSE-ADMIN-SCH-ON") == 0) {
+    if (payloadCharAr[0] == 'N') {
+      isSceduleON = false;
+    } else {
+      isSceduleON = true;
+      scheduledOnTime = atol(payloadCharAr);
+    }
+  }
 }
 
 void connectToBroker() {
-  while (!mqttClient.connected()) {
-    Serial.print("Attempting MQTT connection...");
+  while(!mqttClient.connected()) {
+    Serial.println("Attempting MQTT connection...");
     if (mqttClient.connect("ESP32Client")) {
       Serial.println("connected");
-      mqttClient.subscribe("CSE-ON-OFF");
+      mqttClient.subscribe("CSE-ADMIN-MAIN-ON-OFF");
+      mqttClient.subscribe("CSE-ADMIN-SCH-ON");
     } else {
-      Serial.print("failed");
-      Serial.print(mqttClient.state());
-      Serial.println(" try again in 5 seconds");
+      Serial.println("failed");
+      Serial.println(mqttClient.state());
       delay(5000);
     }
   }
 }
 
 void updateTemperature() {
-  dhtSensor.setup(DHTPIN, DHTesp::DHT22);
   TempAndHumidity data = dhtSensor.getTempAndHumidity();
-  String(data.temperature,2).toCharArray(tempAr, 6);
+  String(data.temperature, 2).toCharArray(tempAr, 6);
 }
 
-void receiveCallback(char* topic, byte* payload, unsigned int length) {
-  Serial.print("Message arrived [");
-  Serial.print(topic);
-  Serial.print("] ");
-  char payloadCharAr[length];
-  for (int i = 0; i < length; i++) {
-    Serial.print((char)payload[i]);
-    payloadCharAr[i] = (char)payload[i];
-  }
+void setupWifi(){
   Serial.println();
+  Serial.println("Connecting to WiFi...");
+  Serial.println("Wokwi-GUEST");
+  WiFi.begin("Wokwi-GUEST", "");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.println(".");
+  }
+  Serial.println("WiFi connected"); 
+  Serial.println("IP address: ");
+  Serial.println(WiFi.localIP());
+}
+
+unsigned long getTime() {
+  timeClient.update();
+  return timeClient.getEpochTime();
+}
+
+void checkSchdule(){
+  if(isSceduleON) {
+    unsigned long currentTime = getTime();
+    if (currentTime > scheduledOnTime) {
+      buzzerOn(true);
+      isSceduleON = false;
+      mqttClient.publish("CSE-ADMIN-MAIN-ON-OFF-ESP", "1");
+      mqttClient.publish("CSE-ADMIN-SCH-ESP-ON", "0");
+      Serial.println("Scheduled ON time");
+    }
+  } else {
+    if (mqttClient.connected()) {
+      mqttClient.publish("CSE-ADMIN-MAIN-ON-OFF", "0");
+    }
+  }
 }
